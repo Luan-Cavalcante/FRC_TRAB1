@@ -7,9 +7,17 @@
 
 struct QNode
 {
-    char message[MAX_MSG+5];
+    char message[MAX_MSG];
     struct QNode *next;
 };
+
+typedef struct Args
+{
+    /* data */
+    char ip[14];
+    char porta[5];
+    char message[MAX_MSG];
+}Args;
 
 // The queue, front stores the front node of LL and rear
 // stores the last node of LL
@@ -19,11 +27,20 @@ typedef struct Queue
 }Queue;
 
 // A utility function to create a new linked list node.
-struct QNode * newNode(char *s)
+struct QNode *newNode(char *s)
 {
     struct QNode *temp = (struct QNode *)malloc(sizeof(struct QNode));
     strcpy(temp->message,s);
     temp->next = NULL;
+    return temp;
+}
+
+struct Args *newArgs(char*msg,char* ip,char*port)
+{
+    struct Args *temp = (struct Args *)malloc(sizeof(struct Args));
+    strcpy(temp->message,msg);
+    strcpy(temp->porta,port);
+    strcpy(temp->ip,ip);
     return temp;
 }
 
@@ -57,11 +74,11 @@ void enQueue(struct Queue *q, char* k)
 // Function to remove a message from given queue q
 char* deQueue(struct Queue *q)
 {
-    char * mensagem = malloc(sizeof(char)*MAX_MSG+1);
+    char* mensagem = malloc(sizeof(char)*MAX_MSG+1);
     // If queue is empty, return NULL.
     if (q->front == NULL)
     {
-        strcpy(mensagem,"Empty");
+        strcpy(mensagem,"1");
         return mensagem;
     }
     // Store previous front and move front one node ahead
@@ -80,11 +97,11 @@ char* deQueue(struct Queue *q)
     return mensagem;
 }
 
-int get_n(char * message,FILE *fp)
+int get_n(char *message,FILE *fp)
 {
     int i = 0;
     char ch;
-
+/*
     do {
         ch = fgetc(fp);
         if(ch==EOF){
@@ -97,17 +114,20 @@ int get_n(char * message,FILE *fp)
         i++;
         printf("%c", ch);
     } while(i<MAX_MSG);
+*/
+    printf("bytes = %ld\n",fread(message,MAX_MSG, 1, fp));
     
     //fgets(message,100,fp);
-    //printf("\n\nlen da mensagem %ld\na mensagem eh %s\n\n\n",strlen(message),message);
+    printf("\n\nlen da mensagem %ld\na mensagem eh %s\n\n\n",strlen(message),message);
 
     return 1;
 }
 
 int le_arquivo(Queue *q,char *nome_arquivo)
 {
-    FILE *fp = fopen(nome_arquivo,"r");
-    char message[MAX_MSG+1];
+    FILE *fp = fopen(nome_arquivo,"rb");
+    char message[MAX_MSG];
+    char header[1000];
 
     // strcpy(destination,source,n_chars)
     if(fp == NULL)
@@ -116,11 +136,39 @@ int le_arquivo(Queue *q,char *nome_arquivo)
         return -1;
     }
 
-    // lê n chars e adiciona pra mensagem na fila
-    int fim = 1;
-    do{
-        fim = get_n(message,fp);
-        //rintf("\n\n%d - a len da message eh %ld\na mensagem eh %s\n\n\n",fim,strlen(message),message);
-        enQueue(q,message);
-    }while(fim == 1);
+    int bytes = 0;
+    strcpy(header,"header-");
+    // write header 
+    //printf("Escrevendo header %s\n",strcat(header,nome_arquivo));
+    //enQueue(q,strcat("header-",nome_arquivo));
+    enQueue(q,strcat(header,nome_arquivo));
+
+    while (fread((message), MAX_MSG, 1, fp)) {
+        printf("\n\nlen da mensagem %ld\na mensagem eh %s\n\n\n",strlen(message),message);
+        message[MAX_MSG] = '\0';
+
+        enQueue(q, message);
+        memset(message, 0x0, MAX_MSG);
+
+    }
+
+    enQueue(q, message);
+    enQueue(q, "FIM\0");
+    memset(message, 0x0, MAX_MSG);
+
+    printf("Arquivo enviado \\(^o^)/\n");
+}
+
+void escreve_arquivo(FILE *fp,char* msg)
+{
+    int i = 0;
+
+    if(strcmp(msg,"FIM\0") == 0){
+        fclose(fp);
+        printf("Arquivo lido com sucesso !!!!\n");
+        return;
+    }
+
+    fwrite(msg,1,strlen(msg),fp);
+
 }

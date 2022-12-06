@@ -25,5 +25,6 @@ void enQueue(struct Queue *q, char* k);
 char* deQueue(struct Queue *q);
 int get_n(char * message,FILE *fp);
 int le_arquivo(Queue *q,char* nome_arquivo);
+int escreve_arquivo(FILE *fp,char* msg);
 
 #endif

@@ -8,30 +8,30 @@
 #include <unistd.h>
 #include <string.h>  
 #include <stdlib.h>
+
 #include "queue.h"
 
-#define MAX_MSG 100
+#define MAX_MSG 50
 
 int main(int argc, char *argv[]){
     int sd, rc, i;
     struct sockaddr_in ladoCli;    //dados do cliente local    
     struct sockaddr_in ladoServ; 	  //dados do servidor remoto  
-
+int debugger = 0;
     //confere o numero de argumentos passados para o programa  
-    if(argc<3){
-        printf("uso correto: %s <ip_do_servidor> <porta_do_servidor> <dado1> ... <dadoN> \n", argv[0]);
-        exit(1);    
-    }
-
+    printf("OPA %d\n",debugger++);
+    printf("%s\n",argv[3]);
     //Preenchendo as informacoes de identificacao do remoto  
-    ladoServ.sin_family 	   = AF_INET;
-    ladoServ.sin_addr.s_addr = inet_addr(argv[1]);
-    ladoServ.sin_port 	   = htons(atoi(argv[2]));
+    ladoServ.sin_family 	    = AF_INET;
+    ladoServ.sin_addr.s_addr    = inet_addr(argv[1]);
+    ladoServ.sin_port 	        = htons(atoi(argv[2]));
+printf("OPA %d\n",debugger++);
 
     //Preenchendo as informacoes de identificacao do cliente  
-    ladoCli.sin_family 	 = AF_INET;
-    ladoCli.sin_addr.s_addr= htonl(INADDR_ANY);
-    ladoCli.sin_port 	     = htons(0);   //usa porta livre entre (1024-5000) 
+    ladoCli.sin_family 	        = AF_INET;
+    ladoCli.sin_addr.s_addr     = htonl(INADDR_ANY);
+    ladoCli.sin_port 	        = htons(0);   //usa porta livre entre (1024-5000) 
+    printf("OPA %d\n",debugger++);
 
     //Criando um socket. Nesse momento a variavel        
     // /sd contem apenas dados sobre familia e protocolo   
@@ -40,14 +40,19 @@ int main(int argc, char *argv[]){
     if(sd<0) {
         printf("%s: nao pode abrir o socket \n",argv[0]);
         exit(1); }
+    printf("OPA %d\n",debugger++);
 
     //Relacionando o socket sd com a estrutura ladoCli  
     //Depois do bind, sd faz referencia a protocolo local, ip local e porta local  
     rc = bind(sd, (struct sockaddr *) &ladoCli, sizeof(ladoCli));
     if(rc<0) {
         printf("%s: nao pode fazer um bind da porta\n", argv[0]);
-        exit(1); }
+        exit(1);
+    }
+
+
     printf("{UDP, IP_Cli: %s, Porta_Cli: %u, IP_R: %s, Porta_R: %s}\n", inet_ntoa(ladoCli.sin_addr), ntohs(ladoCli.sin_port), argv[1], argv[2]);
+    printf("OPA %d\n",debugger++);
 
     //Enviando um pacote para cada parametro informado  
     // PASSO A PASSO
@@ -59,51 +64,93 @@ int main(int argc, char *argv[]){
 
     char nome_arquivo[64];
     
-    for(;;)
-    {
-        printf("### Teste ###\n");
-        printf("Qual arquivo você deseja ler :");
-        scanf("%s",nome_arquivo);
+    // ler o arquivo e passar ele pra fila de mensagem
+    Queue *q = createQueue();
+
+    // da fila de mensagem, escrever a PDU com a mensagem lida
+    // enviar a PDU
+    //while ((getchar()) != '\n');
+
+    char message[MAX_MSG];
+    int aux = 0;
+    int state = 0;
+
+    while(1) {
         
-        // ler o arquivo e passar ele pra fila de mensagem
-        FILE *fp = fopen(nome_arquivo,"r");
-        Queue *q = createQueue();
+        if(state == 0)
+        {
+            printf("Qual nome do arquivo quer enviar ? (DIGITE SWAP para receber mensagem)");
+            scanf("%s",nome_arquivo);
+            if(strcmp(nome_arquivo,"SWAP") == 0)
+            {
+                printf("Mudando para receber message mode . . .\n");
+                state = 1;
+                continue;
+            }
+            le_arquivo(q,nome_arquivo);
 
-        // da fila de mensagem, escrever a PDU com a mensagem lida
-        // enviar a PDU
+            while(1){
+                strcpy(message,deQueue(q));
 
+                if (strcmp(message,"1") != 0 ) {
+                    //chama função para tratamento de envio dos dados coletados da fila de mensagens:
+                    //recuperar dados da fila  
+                    //alimentar PDU com a mensagem - lembrar que a mensagem é uma string de tamanho
+                    //variável 
+                    printf("Vou enviar %s\n",message);
+                    rc = sendto(sd, message, MAX_MSG, 0,(struct sockaddr *) &ladoServ, sizeof(ladoServ));
+                    
+                    if(rc<0) {
+                        printf("%s: nao pode enviar dados\n",argv[0]);
+                        close(sd);
+                        exit(1); 
+                    }
+                    //enviar PDU  
+                    //aguardar reconhecimento da PDU enviada 
+                    //etc.  
+                }
+                else{
+                    break;
+                }
+            }
+        }
+        else if(state == 1)
+        {
+            printf("Pronto para receber mensagem\n");
+            rc = sendto(sd, "SWAP", MAX_MSG, 0,(struct sockaddr *) &ladoServ, sizeof(ladoServ));
 
+            char msg[MAX_MSG];
+            int tam_Serv;
+            int n;
 
-        while ((getchar()) != '\n');
+            /* inicia o buffer */
+            memset(msg, 0x0, MAX_MSG);
+            tam_Serv = sizeof(ladoServ);
+            /* recebe a mensagem  */
+            n = recvfrom(sd, msg, MAX_MSG, 0, (struct sockaddr *)&ladoServ, &tam_Serv);
+            
+            if (n < 0)
+            {
+                printf("%s: nao pode receber dados \n", msg);
+                continue;
+            }
+
+            if (strncmp(msg, "SWAP",4) == 0)
+            {
+                state = 0;
+                printf("Mudando para enviar file mode\n");
+                continue;
+            }
+
+            if (strcmp(msg, "FIM") == 0)
+                exit(0);
+
+            /* imprime a mensagem recebida na tela do usuario */
+            printf("{UDP, IP_L: %s, Porta_L: %u", inet_ntoa(ladoServ.sin_addr), ntohs(ladoServ.sin_port));
+            printf(" IP_R: %s, Porta_R: %u} => %s\n", inet_ntoa(ladoServ.sin_addr), ntohs(ladoServ.sin_port), msg);
+        }
     }
 
 
-    while(1) {
-        if (le_fila() == 1) {
-            //chama função para tratamento de envio dos dados coletados da fila de mensagens:
-            //recuperar dados da fila  
-            //alimentar PDU com a mensagem - lembrar que a mensagem é uma string de tamanho
-            //variável 
-            rc = sendto(sd, argv[i], strlen(argv[i]), 0,(struct sockaddr *) &ladoServ, sizeof(ladoServ));
-        if(rc<0) {
-            printf("%s: nao pode enviar dados %d \n",argv[0],i-1);
-            close(sd);
-            exit(1); 
-        }
-        printf("Enviando parametro %d: %s\n", i-2, argv[i]);
-            //enviar PDU  
-            //aguardar reconhecimento da PDU enviada 
-            //etc.  
-        }   fim-if  
-        if (le_porta_socket() == true) {
-            //chama função para tratamento de recepção dos dados recebidos pela porta_socket:
-            //recuperar dados da porta socket  
-            //desmontar a PDU recebida  
-            //entregar dados recebidos para a camada superior, via fila de mensagens  
-            //enviar reconhecimento  
-            //etc.  
-            }   fim-if  
-    }   //fim-while 
-
-    return 1;
+    return 0;
 }

@@ -24,7 +24,6 @@ Passo a passo
 */
 // A linked list (LL) node to store a queue entry
 
-
 int main()
 {
     Queue *q = createQueue();
@@ -35,18 +34,21 @@ int main()
     printf("Queue Front : %s \n", q->front->message);
     printf("Queue Rear : %s\n", q->rear->message);
 
-    printf("### PRINTANDO POEMA ####\n\n");
-int i = 0;
-    while(i<15)
+    printf("### PRINTANDO POEMA CARAI  ####\n\n");
+    int i = 0;
+    while(i<20)
     {
         //printf("Entrei\n");
         //printf("### teste = %s ###\n",teste);
-        if(strcmp(teste,"Empty") != 0)
+        strcpy(teste,deQueue(q));
+
+        if(strcmp(teste,"FIM\0") != 0)
         {   
-            printf("%s",deQueue(q));
-            
+            printf("%s",teste);
         }
         else{
+            printf("Da hora\n");
+            printf("Acabou com sucesso\n");
             break;
         }
 
